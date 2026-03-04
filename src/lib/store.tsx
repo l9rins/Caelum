@@ -88,8 +88,7 @@ function reducer(state: AppState, action: Action): AppState {
         case "SET_STAT": {
             const newEdits = new Map(state.edits);
             const key = String(action.offset);
-            if (!newEdits.has(action.pid))
-                newEdits.set(action.pid, new Map());
+            if (!newEdits.has(action.pid)) newEdits.set(action.pid, new Map());
             const pm = new Map(newEdits.get(action.pid)!);
 
             if (action.newStat === action.oldStat) {
@@ -125,15 +124,10 @@ interface StoreContextValue {
     state: AppState;
     loadFile: (file: File) => Promise<void>;
     selectPlayer: (pid: number) => void;
-    setStat: (
-        pid: number,
-        offset: number,
-        oldStat: number,
-        newStat: number
-    ) => void;
+    setStat: (pid: number, offset: number, oldStat: number, newStat: number) => void;
     resetPlayer: (pid: number) => void;
     resetAll: () => void;
-    downloadPatched: () => void;
+    downloadPatched: () => number | undefined;
     totalEdits: number;
     editedPlayerCount: number;
 }
@@ -162,10 +156,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return a - b;
         });
 
-        const totalNodes = [...map.values()].reduce(
-            (s, n) => s + n.length,
-            0
-        );
+        const totalNodes = [...map.values()].reduce((s, n) => s + n.length, 0);
 
         dispatch({
             type: "FILE_LOADED",
@@ -188,17 +179,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const setStat = useCallback(
         (pid: number, offset: number, oldStat: number, newStat: number) => {
-            const clamped = Math.max(
-                25,
-                Math.min(99, Math.round(isNaN(newStat) ? 25 : newStat))
-            );
-            dispatch({
-                type: "SET_STAT",
-                pid,
-                offset,
-                oldStat,
-                newStat: clamped,
-            });
+            const clamped = Math.max(25, Math.min(99, Math.round(isNaN(newStat) ? 25 : newStat)));
+            dispatch({ type: "SET_STAT", pid, offset, oldStat, newStat: clamped });
         },
         []
     );
@@ -211,15 +193,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "RESET_ALL" });
     }, []);
 
-    const downloadPatched = useCallback(() => {
-        if (!state.originalBuf) return;
-        const { patched, count } = applyPatches(
-            state.originalBuf,
-            state.edits
-        );
-        const blob = new Blob([patched], {
-            type: "application/octet-stream",
-        });
+    // ANTIPATTERN GUARD: originalBuf is never mutated.
+    // applyPatches() clones it, writes patched floats, recalculates CRC32, returns blob.
+    const downloadPatched = useCallback((): number | undefined => {
+        if (!state.originalBuf) return undefined;
+        const { patched, count } = applyPatches(state.originalBuf, state.edits);
+        const blob = new Blob([patched], { type: "application/octet-stream" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -229,13 +208,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return count;
     }, [state.originalBuf, state.edits]);
 
-    const totalEdits = [...state.edits.values()].reduce(
-        (s, m) => s + m.size,
-        0
-    );
-    const editedPlayerCount = [...state.edits.values()].filter(
-        (m) => m.size > 0
-    ).length;
+    const totalEdits = [...state.edits.values()].reduce((s, m) => s + m.size, 0);
+    const editedPlayerCount = [...state.edits.values()].filter((m) => m.size > 0).length;
 
     return (
         <StoreContext.Provider

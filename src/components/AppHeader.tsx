@@ -14,11 +14,7 @@ export function AppHeader() {
             {/* Brand */}
             <div className="flex items-center gap-0 h-full px-5 border-r border-cborder shrink-0">
                 <div className="w-7 h-7 relative mr-2.5 shrink-0">
-                    <svg
-                        viewBox="0 0 28 28"
-                        fill="none"
-                        className="w-full h-full"
-                    >
+                    <svg viewBox="0 0 28 28" fill="none" className="w-full h-full">
                         <polygon
                             points="14,1 27,7.5 27,20.5 14,27 1,20.5 1,7.5"
                             stroke="#00d4ff"
@@ -62,7 +58,7 @@ export function AppHeader() {
                     variant="outline"
                     className="font-dmono text-[.6rem] tracking-[.12em] uppercase border-cyan text-cyan shadow-[0_0_8px_rgba(0,212,255,0.2)] rounded-none"
                 >
-                    B-Tree Engine v1
+                    B-Tree Engine v2
                 </Badge>
                 <Badge
                     variant="outline"

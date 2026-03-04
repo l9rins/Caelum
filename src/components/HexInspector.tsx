@@ -1,49 +1,72 @@
 import { useStore } from "@/lib/store";
 import {
     toHex,
-    treeLabel,
-    statToKey,
     floatToHex,
+    statToKey,
+    treeLabel,
 } from "@/lib/btree-engine";
 
 export function HexInspector() {
     const { state } = useStore();
     const pid = state.selectedPid;
-    if (!pid) return null;
-    const nodes = state.playerMap.get(pid);
-    if (!nodes) return null;
+    if (!pid || !state.playerMap.has(pid)) return null;
+
+    const nodes = state.playerMap.get(pid)!;
     const pidEdits = state.edits.get(pid);
+    const pidHi = (pid >> 8) & 0xff;
+    const pidLo = pid & 0xff;
+    const pidHex =
+        pidHi.toString(16).padStart(2, "0").toUpperCase() +
+        " " +
+        pidLo.toString(16).padStart(2, "0").toUpperCase();
 
     return (
         <div className="bg-surface border border-cborder p-4">
-            <div className="font-bebas text-[.9rem] tracking-[.12em] text-ctext2 mb-3 flex items-center gap-2.5">
-                <span className="text-cyan text-[.8rem]">⬡</span>
+            {/* Title */}
+            <div className="font-bebas text-[.9rem] tracking-[.12em] text-ctext2 mb-3 flex items-center gap-2">
+                <span className="text-cyan">⬡</span>
                 Node Inspector — raw 12-byte patterns
             </div>
+
             <div className="flex flex-col gap-0.5">
-                {nodes.map((n) => {
-                    const edit = pidEdits?.get(String(n.offset));
-                    const curFval = edit ? statToKey(edit.newStat) : n.fval;
-                    const stat = edit ? edit.newStat : n.stat;
-                    const pHi = (pid >> 8) & 0xff;
-                    const pLo = pid & 0xff;
-                    const rawPid = `${pHi.toString(16).padStart(2, "0").toUpperCase()} ${pLo.toString(16).padStart(2, "0").toUpperCase()}`;
-                    const fhex = floatToHex(curFval);
-                    const tid = n.treeId;
+                {nodes.map((node) => {
+                    const edit = pidEdits?.get(String(node.offset));
+                    const curStat = edit ? edit.newStat : node.stat;
+                    const curFval = statToKey(curStat);
+                    const fHex = floatToHex(curFval);
+                    const tid = node.treeId;
+                    const modified = edit !== undefined;
 
                     return (
                         <div
-                            key={n.offset}
-                            className="grid grid-cols-[90px_1fr_1fr] gap-4 font-dmono text-[.62rem] py-1 px-1.5 bg-ccard transition-colors hover:bg-lift"
+                            key={node.offset}
+                            className={`grid font-dmono text-[.62rem] px-2 py-1.5 transition-colors hover:bg-lift
+                                ${modified ? "bg-cyan/[0.04] border-l border-l-cyan" : "bg-ccard"}`}
+                            style={{
+                                gridTemplateColumns: "90px 1fr 1fr",
+                                gap: "1rem",
+                            }}
                         >
+                            {/* Offset + tree */}
                             <span className="text-ctext3">
-                                {toHex(n.offset, 6)} [T{tid >= 0 ? tid : "?"}]
+                                {toHex(node.offset, 6)}{" "}
+                                <span className="text-ctext3/60">[T{tid >= 0 ? tid : "?"}]</span>
                             </span>
+
+                            {/* Raw bytes */}
                             <span className="text-cyan2 tracking-[.06em]">
-                                01 30 {rawPid} 00 00 00 00 {fhex}
+                                01 30 {pidHex} 00 00 00 00 {fHex}
                             </span>
+
+                            {/* Decoded */}
                             <span className="text-green2">
-                                stat={stat} · {treeLabel(tid)}
+                                stat={curStat}
+                                {modified && (
+                                    <span className="text-amber ml-1">
+                                        ← was {node.stat}
+                                    </span>
+                                )}{" "}
+                                · {treeLabel(tid)}
                             </span>
                         </div>
                     );

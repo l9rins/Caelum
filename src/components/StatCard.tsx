@@ -1,160 +1,144 @@
 import { useCallback } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useStore } from "@/lib/store";
-import type { BTreeNode } from "@/lib/btree-engine";
 import {
+    treeLabel,
     toHex,
-    statToKey,
     floatToHex,
-    getStatTier,
+    statToKey,
+    type BTreeNode,
 } from "@/lib/btree-engine";
-import { treeLabel } from "@/lib/btree-engine";
 
 interface StatCardProps {
     pid: number;
     node: BTreeNode;
 }
 
-const TIER_COLORS: Record<string, string> = {
-    elite: "text-amber",
-    great: "text-cyan",
-    good: "text-green2",
-    avg: "text-ctext2",
-    poor: "text-ctext3",
-};
+function statColor(v: number) {
+    if (v >= 95) return "text-amber";
+    if (v >= 85) return "text-cyan";
+    if (v >= 75) return "text-green2";
+    if (v >= 60) return "text-ctext2";
+    return "text-ctext3";
+}
 
-const TIER_BAR_COLORS: Record<string, string> = {
-    elite: "#ffaa00",
-    great: "#00d4ff",
-    good: "#00ff88",
-    avg: "#3a4f72",
-    poor: "#1a2540",
-};
+function barColor(v: number) {
+    if (v >= 95) return "#ffaa00";
+    if (v >= 85) return "#00d4ff";
+    if (v >= 75) return "#00ff88";
+    if (v >= 60) return "#3a4f72";
+    return "#1a2540";
+}
 
 export function StatCard({ pid, node }: StatCardProps) {
     const { state, setStat } = useStore();
+
     const pidEdits = state.edits.get(pid);
     const edit = pidEdits?.get(String(node.offset));
     const curStat = edit ? edit.newStat : node.stat;
-    const origStat = node.stat;
-    const delta = curStat - origStat;
+    const delta = curStat - node.stat;
     const modified = delta !== 0;
-    const tier = getStatTier(curStat);
+
     const pct = Math.max(0, Math.min(100, ((curStat - 25) / 74) * 100));
     const curFval = statToKey(curStat);
-    const label = treeLabel(node.treeId);
 
-    const handleAdjust = useCallback(
+    const adjust = useCallback(
         (d: number) => {
-            setStat(pid, node.offset, origStat, curStat + d);
+            setStat(pid, node.offset, node.stat, curStat + d);
         },
-        [pid, node.offset, origStat, curStat, setStat]
+        [pid, node.offset, node.stat, curStat, setStat]
     );
 
     const handleInput = useCallback(
-        (val: string) => {
-            const n = parseInt(val, 10);
-            if (!isNaN(n)) {
-                setStat(pid, node.offset, origStat, n);
-            }
+        (raw: string) => {
+            const val = parseInt(raw, 10);
+            if (!isNaN(val)) setStat(pid, node.offset, node.stat, val);
         },
-        [pid, node.offset, origStat, setStat]
+        [pid, node.offset, node.stat, setStat]
     );
 
     return (
-        <Card
-            className={`bg-ccard border-cborder p-3.5 pb-3 relative transition-colors clip-corner rounded-none gap-0 ${modified ? "border-cyan" : "hover:border-cborder2"
+        <div
+            className={`bg-ccard border p-3.5 relative transition-colors
+                ${modified
+                    ? "border-cyan"
+                    : "border-cborder hover:border-cborder2"
                 }`}
+            style={{
+                clipPath:
+                    "polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%)",
+            }}
         >
-            {/* Left accent bar */}
+            {/* Left accent stripe when modified */}
             {modified && (
-                <div className="absolute top-0 left-0 w-0.5 h-full bg-cyan" />
+                <div className="absolute left-0 top-0 h-full w-0.5 bg-cyan" />
             )}
 
-            {/* Top: label + tree ID */}
+            {/* Header row */}
             <div className="flex items-start justify-between mb-2.5">
-                <span className="text-[.78rem] font-medium text-ctext leading-tight">
-                    {label}
-                </span>
-                <Badge
-                    variant="outline"
-                    className="font-dmono text-[.55rem] text-ctext3 bg-surface border-cborder shrink-0 rounded-none px-1.5 py-0.5"
-                >
+                <div className="text-[.78rem] font-medium text-ctext leading-tight">
+                    {treeLabel(node.treeId)}
+                </div>
+                <div className="font-dmono text-[.55rem] text-ctext3 bg-surface border border-cborder px-1.5 py-0.5 shrink-0 ml-2">
                     {toHex(node.offset, 6)}
-                </Badge>
+                </div>
             </div>
 
             {/* Value + bar */}
             <div className="flex items-end gap-3 mb-2">
-                <span
-                    className={`font-bebas text-[2.4rem] leading-none transition-colors ${TIER_COLORS[tier]}`}
+                <div
+                    className={`font-bebas text-[2.4rem] leading-none transition-colors ${statColor(curStat)}`}
                 >
                     {curStat}
-                </span>
+                </div>
                 <div className="flex-1 pb-1">
-                    <div className="h-[3px] bg-cborder mb-1.5 relative overflow-hidden">
+                    {/* Bar */}
+                    <div className="h-[3px] bg-cborder mb-1.5 overflow-hidden">
                         <div
-                            className="absolute top-0 left-0 h-full stat-bar-fill"
-                            style={{
-                                width: `${pct}%`,
-                                background: TIER_BAR_COLORS[tier],
-                            }}
+                            className="stat-bar-fill h-full"
+                            style={{ width: `${pct}%`, background: barColor(curStat) }}
                         />
                     </div>
-                    <div className="font-dmono text-[.56rem] text-ctext3 leading-6">
+                    {/* Hex readout */}
+                    <div className="font-dmono text-[.56rem] text-ctext3 leading-none">
                         key=
-                        <span className="text-cyan2 tracking-[.06em]">
-                            {curFval.toFixed(2)}
-                        </span>{" "}
-                        ·{" "}
-                        <span className="text-cyan2 tracking-[.06em]">
-                            {floatToHex(curFval)}
-                        </span>
+                        <span className="text-cyan2">{curFval.toFixed(2)}</span>
+                        {" · "}
+                        <span className="text-cyan2">{floatToHex(curFval)}</span>
                     </div>
                 </div>
             </div>
 
             {/* Controls */}
-            <div className="flex items-center gap-1.5 mt-2">
-                <Button
-                    variant="outline"
-                    size="icon"
-                    className="w-6 h-6 bg-surface border-cborder text-ctext2 font-dmono text-base rounded-none hover:bg-cyan hover:border-cyan hover:text-void disabled:opacity-20"
-                    onClick={() => handleAdjust(-1)}
+            <div className="flex items-center gap-1.5">
+                <button
+                    className="w-6 h-6 bg-surface border border-cborder text-ctext2 font-dmono text-base flex items-center justify-center transition-colors hover:bg-cyan hover:border-cyan hover:text-void disabled:opacity-20 disabled:cursor-not-allowed"
+                    onClick={() => adjust(-1)}
                     disabled={curStat <= 25}
                 >
                     −
-                </Button>
+                </button>
                 <input
                     type="number"
                     min={25}
                     max={99}
                     value={curStat}
+                    className="flex-1 max-w-[58px] bg-surface border border-cborder text-ctext font-dmono text-[.8rem] text-center py-1 outline-none focus:border-cyan transition-colors"
                     onChange={(e) => handleInput(e.target.value)}
-                    className="flex-1 max-w-[58px] bg-surface border border-cborder text-ctext font-dmono text-[.8rem] text-center py-1 px-1.5 outline-none transition-colors focus:border-cyan"
                 />
-                <Button
-                    variant="outline"
-                    size="icon"
-                    className="w-6 h-6 bg-surface border-cborder text-ctext2 font-dmono text-base rounded-none hover:bg-cyan hover:border-cyan hover:text-void disabled:opacity-20"
-                    onClick={() => handleAdjust(1)}
+                <button
+                    className="w-6 h-6 bg-surface border border-cborder text-ctext2 font-dmono text-base flex items-center justify-center transition-colors hover:bg-cyan hover:border-cyan hover:text-void disabled:opacity-20 disabled:cursor-not-allowed"
+                    onClick={() => adjust(1)}
                     disabled={curStat >= 99}
                 >
                     +
-                </Button>
+                </button>
                 <div
-                    className={`font-dmono text-[.65rem] min-w-[30px] text-right transition-colors ${delta > 0
-                        ? "text-green2"
-                        : delta < 0
-                            ? "text-cred"
-                            : "text-transparent"
-                        }`}
+                    className={`font-dmono text-[.65rem] min-w-[30px] text-right transition-colors
+                        ${delta > 0 ? "text-green2" : delta < 0 ? "text-cred" : "text-transparent"}`}
                 >
-                    {delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : ""}
+                    {delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "+0"}
                 </div>
             </div>
-        </Card>
+        </div>
     );
 }
