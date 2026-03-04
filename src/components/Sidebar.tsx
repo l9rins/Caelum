@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import {
     KNOWN_PLAYERS,
     toHex,
+    getPlayerName,
     getPlayerInitials,
     getPlayerOvr,
 } from "@/lib/btree-engine";
@@ -29,13 +30,13 @@ export function Sidebar() {
         const q = filter.toLowerCase().trim();
         if (!q) return state.sortedPids;
         return state.sortedPids.filter((pid) => {
-            const known = KNOWN_PLAYERS[pid];
-            if (known && known.name.toLowerCase().includes(q)) return true;
+            const name = getPlayerName(pid, state.nameMap);
+            if (name.toLowerCase().includes(q)) return true;
             if (toHex(pid).toLowerCase().includes(q)) return true;
             if (String(pid).includes(q)) return true;
             return false;
         });
-    }, [state.sortedPids, filter]);
+    }, [state.sortedPids, state.nameMap, filter]);
 
     // Keyboard nav
     useEffect(() => {
@@ -66,10 +67,10 @@ export function Sidebar() {
                 </div>
                 <div
                     className={`relative border p-4 text-center cursor-pointer transition-all clip-corner-lg ${loaded
-                            ? "border-green2 bg-green2/[0.04]"
-                            : dragging
-                                ? "border-cyan bg-cyan-dim"
-                                : "border-cborder2 bg-surface hover:border-cyan hover:bg-cyan-dim"
+                        ? "border-green2 bg-green2/[0.04]"
+                        : dragging
+                            ? "border-cyan bg-cyan-dim"
+                            : "border-cborder2 bg-surface hover:border-cyan hover:bg-cyan-dim"
                         }`}
                     onDragOver={(e) => {
                         e.preventDefault();
@@ -142,9 +143,9 @@ export function Sidebar() {
                     {filteredPids.map((pid) => {
                         const nodes = state.playerMap.get(pid)!;
                         const known = KNOWN_PLAYERS[pid];
-                        const name = known?.name ?? `Player ${toHex(pid)}`;
+                        const name = getPlayerName(pid, state.nameMap);
                         const meta = known ? `${known.pos} · ${known.team}` : toHex(pid);
-                        const initials = getPlayerInitials(pid);
+                        const initials = getPlayerInitials(pid, state.nameMap);
                         const pidEdits = state.edits.get(pid);
                         const ovr = getPlayerOvr(nodes, pidEdits);
                         const active = pid === state.selectedPid;
@@ -162,15 +163,15 @@ export function Sidebar() {
                             <div
                                 key={pid}
                                 className={`flex items-center gap-2.5 py-2 px-4 cursor-pointer transition-colors border-l-2 relative ${active
-                                        ? "bg-cyan-dim border-l-cyan"
-                                        : "border-l-transparent hover:bg-surface"
+                                    ? "bg-cyan-dim border-l-cyan"
+                                    : "border-l-transparent hover:bg-surface"
                                     } ${hasEdit ? "player-edited" : ""}`}
                                 onClick={() => selectPlayer(pid)}
                             >
                                 <div
                                     className={`w-[30px] h-[30px] shrink-0 clip-hex flex items-center justify-center font-bebas text-[.7rem] border border-cborder2 ${active
-                                            ? "bg-cyan text-void"
-                                            : "bg-lift text-ctext2"
+                                        ? "bg-cyan text-void"
+                                        : "bg-lift text-ctext2"
                                         }`}
                                 >
                                     {initials}

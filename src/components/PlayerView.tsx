@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import {
     KNOWN_PLAYERS,
     toHex,
+    getPlayerName,
     getPlayerOvr,
 } from "@/lib/btree-engine";
 import { StatCard } from "./StatCard";
@@ -34,7 +35,7 @@ export function PlayerView() {
 
     const nodes = state.playerMap.get(pid)!;
     const known = KNOWN_PLAYERS[pid];
-    const name = known?.name ?? `Player ${toHex(pid)}`;
+    const name = getPlayerName(pid, state.nameMap);
     const pidEdits = state.edits.get(pid) ?? new Map();
     const ovr = getPlayerOvr(nodes, pidEdits);
     const uniqueTrees = new Set(nodes.map((n) => n.treeId)).size;

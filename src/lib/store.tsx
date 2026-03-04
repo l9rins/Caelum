@@ -10,6 +10,7 @@ import {
     scanBTree,
     applyPatches,
     KNOWN_PLAYERS,
+    getPlayerName,
 } from "./btree-engine";
 
 // ── State ────────────────────────────────────────────────────
@@ -24,6 +25,7 @@ export interface FileInfo {
 export interface AppState {
     originalBuf: ArrayBuffer | null;
     playerMap: Map<number, BTreeNode[]>;
+    nameMap: Map<number, string>;
     sortedPids: number[];
     edits: Map<number, Map<string, Edit>>;
     selectedPid: number | null;
@@ -35,6 +37,7 @@ export interface AppState {
 const initialState: AppState = {
     originalBuf: null,
     playerMap: new Map(),
+    nameMap: new Map(),
     sortedPids: [],
     edits: new Map(),
     selectedPid: null,
@@ -51,6 +54,7 @@ type Action =
         type: "FILE_LOADED";
         buf: ArrayBuffer;
         map: Map<number, BTreeNode[]>;
+        nameMap: Map<number, string>;
         sortedPids: number[];
         fileInfo: FileInfo;
     }
@@ -76,6 +80,7 @@ function reducer(state: AppState, action: Action): AppState {
                 ...state,
                 originalBuf: action.buf,
                 playerMap: action.map,
+                nameMap: action.nameMap,
                 sortedPids: action.sortedPids,
                 edits: new Map(),
                 selectedPid: null,
@@ -146,14 +151,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SET_LOADING", msg: "Scanning B-Tree…" });
         await new Promise((r) => setTimeout(r, 32));
 
-        const { map, elapsed } = scanBTree(buf);
+        const { map, nameMap, elapsed } = scanBTree(buf);
 
+        // Sort: named players first (resolved or known), then by PID
         const sortedPids = Array.from(map.keys()).sort((a, b) => {
-            const ak = !!KNOWN_PLAYERS[a];
-            const bk = !!KNOWN_PLAYERS[b];
-            if (ak && !bk) return -1;
-            if (!ak && bk) return 1;
-            return a - b;
+            const aName = nameMap.has(a) || !!KNOWN_PLAYERS[a];
+            const bName = nameMap.has(b) || !!KNOWN_PLAYERS[b];
+            if (aName && !bName) return -1;
+            if (!aName && bName) return 1;
+            // Alphabetical by resolved name
+            const an = getPlayerName(a, nameMap);
+            const bn = getPlayerName(b, nameMap);
+            return an.localeCompare(bn);
         });
 
         const totalNodes = [...map.values()].reduce((s, n) => s + n.length, 0);
@@ -162,6 +171,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             type: "FILE_LOADED",
             buf,
             map,
+            nameMap,
             sortedPids,
             fileInfo: {
                 name: file.name,
