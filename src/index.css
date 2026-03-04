@@ -1,0 +1,309 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ═══════════════════════════════════════════
+   CAELUM — Celestial-Brutalist Theme for shadcn
+   Navy-black. Cyan fire. NASA meets sneaker drop.
+═══════════════════════════════════════════ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Caelum custom colors */
+  --color-void: #05070d;
+  --color-deep: #080c16;
+  --color-surface: #0d1220;
+  --color-ccard: #101726;
+  --color-lift: #141e30;
+  --color-cborder: #1a2540;
+  --color-cborder2: #222f4a;
+  --color-cyan: #00d4ff;
+  --color-cyan2: #0099cc;
+  --color-cyan-dim: rgba(0, 212, 255, 0.08);
+  --color-cyan-glow: rgba(0, 212, 255, 0.15);
+  --color-amber: #ffaa00;
+  --color-green2: #00ff88;
+  --color-cred: #ff3355;
+  --color-ctext: #c8d8f0;
+  --color-ctext2: #7a90b8;
+  --color-ctext3: #3a4f72;
+
+  /* Caelum fonts */
+  --font-bebas: "Bebas Neue", sans-serif;
+  --font-dmono: "DM Mono", monospace;
+  --font-barlow: "Barlow", sans-serif;
+
+  /* Caelum animations */
+  --animate-pulse-badge: pulse-badge 2s ease-in-out infinite;
+  --animate-hex-pulse: hex-pulse 3s ease-in-out infinite;
+  --animate-toast-in: toast-in 0.2s ease;
+  --animate-spin-slow: spin 0.7s linear infinite;
+}
+
+:root {
+  --radius: 0.25rem;
+  --background: #05070d;
+  --foreground: #c8d8f0;
+  --card: #101726;
+  --card-foreground: #c8d8f0;
+  --popover: #0d1220;
+  --popover-foreground: #c8d8f0;
+  --primary: #00d4ff;
+  --primary-foreground: #05070d;
+  --secondary: #141e30;
+  --secondary-foreground: #c8d8f0;
+  --muted: #0d1220;
+  --muted-foreground: #7a90b8;
+  --accent: #141e30;
+  --accent-foreground: #c8d8f0;
+  --destructive: #ff3355;
+  --border: #1a2540;
+  --input: #1a2540;
+  --ring: #00d4ff;
+  --chart-1: #00d4ff;
+  --chart-2: #00ff88;
+  --chart-3: #ffaa00;
+  --chart-4: #ff3355;
+  --chart-5: #8855ff;
+  --sidebar: #080c16;
+  --sidebar-foreground: #c8d8f0;
+  --sidebar-primary: #00d4ff;
+  --sidebar-primary-foreground: #05070d;
+  --sidebar-accent: #141e30;
+  --sidebar-accent-foreground: #c8d8f0;
+  --sidebar-border: #1a2540;
+  --sidebar-ring: #00d4ff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@keyframes pulse-badge {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(0, 212, 255, 0);
+  }
+}
+
+@keyframes hex-pulse {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  font-family: "Barlow", sans-serif;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Constellation background ── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image: radial-gradient(1px 1px at 12% 18%,
+      rgba(0, 212, 255, 0.35) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 34% 7%,
+      rgba(0, 212, 255, 0.2) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 67% 22%,
+      rgba(0, 212, 255, 0.4) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 88% 11%,
+      rgba(0, 212, 255, 0.25) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 5% 44%,
+      rgba(0, 212, 255, 0.15) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 91% 55%,
+      rgba(0, 212, 255, 0.3) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 23% 71%,
+      rgba(0, 212, 255, 0.2) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 54% 88%,
+      rgba(0, 212, 255, 0.35) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 76% 66%,
+      rgba(0, 212, 255, 0.18) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 41% 33%,
+      rgba(0, 212, 255, 0.28) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 19% 92%,
+      rgba(0, 212, 255, 0.22) 0%,
+      transparent 100%),
+    radial-gradient(1px 1px at 83% 79%,
+      rgba(0, 212, 255, 0.32) 0%,
+      transparent 100%),
+    radial-gradient(600px 600px at 70% 20%,
+      rgba(0, 80, 160, 0.06) 0%,
+      transparent 70%),
+    radial-gradient(400px 400px at 20% 80%,
+      rgba(0, 40, 100, 0.08) 0%,
+      transparent 70%);
+  pointer-events: none;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: repeating-linear-gradient(0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 212, 255, 0.012) 2px,
+      rgba(0, 212, 255, 0.012) 3px);
+  pointer-events: none;
+}
+
+/* ── Hexagon clip path for avatars ── */
+.clip-hex {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+/* ── Brutal corner cut ── */
+.clip-corner {
+  clip-path: polygon(0 0,
+      calc(100% - 6px) 0,
+      100% 6px,
+      100% 100%,
+      0 100%);
+}
+
+.clip-corner-sm {
+  clip-path: polygon(0 0,
+      calc(100% - 5px) 0,
+      100% 5px,
+      100% 100%,
+      0 100%);
+}
+
+.clip-corner-lg {
+  clip-path: polygon(0 0,
+      calc(100% - 8px) 0,
+      100% 8px,
+      100% 100%,
+      8px 100%,
+      0 calc(100% - 8px));
+}
+
+/* ── Custom scrollbar ── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #222f4a;
+}
+
+/* ── Input number arrows hide ── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ── Stat bar fill transition ── */
+.stat-bar-fill {
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.3s;
+}
+
+/* ── Player row edited dot ── */
+.player-edited::after {
+  content: "●";
+  position: absolute;
+  right: 0.75rem;
+  font-size: 0.45rem;
+  color: #ffaa00;
+}
+
+/* ── Responsive ── */
+@media (max-width: 780px) {
+  .main-grid {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 52px 200px 1fr !important;
+  }
+}
