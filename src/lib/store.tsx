@@ -1,247 +1,207 @@
+import { create } from "zustand";
 import {
-    createContext,
-    useContext,
-    useReducer,
-    useCallback,
-    type ReactNode,
-} from "react";
-import type { BTreeNode, Edit } from "./btree-engine";
-import {
-    scanBTree,
-    applyPatches,
-    KNOWN_PLAYERS,
-    getPlayerName,
-} from "./btree-engine";
+    readSlot,
+    writeStat as engineWriteStat,
+    writeTend as engineWriteTend,
+    writeHotZone as engineWriteHotZone,
+    applyAllFromCSV as engineApplyAll,
+    fixCRC,
+    validateCRC,
+    buildNamePool,
+    readPlayerName,
+    parseCSV,
+    decodeStat,
+    FLAT,
+    SZ,
+    SOFF,
+    N,
+    type SlotData,
+    type CSVRow,
+    EMBEDDED_MAP,
+} from "./flat-engine";
 
-// ── State ────────────────────────────────────────────────────
-export interface FileInfo {
-    name: string;
-    size: number;
-    nodeCount: number;
-    scanTime: string;
-    playerCount: number;
+export interface CaelumStore {
+    // ── File state ─────────────────────────────────────────
+    buf: Uint8Array | null;
+    fileName: string;
+    csvFileName: string;
+    crcOk: boolean | null;
+    status: string;
+
+    // ── Parsed data ────────────────────────────────────────
+    namePool: string[];
+    csvDb: Record<number, CSVRow> | null;
+    ovrCache: Record<number, number>;
+
+    // ── Selection ──────────────────────────────────────────
+    selectedSlot: number | null;
+
+    // ── Actions ────────────────────────────────────────────
+    loadROS: (bytes: Uint8Array, name: string) => void;
+    loadCSV: (text: string, name: string) => void;
+    selectPlayer: (slot: number | null) => void;
+    doWriteStat: (slot: number, index: number, value: number) => void;
+    doWriteTend: (slot: number, index: number, value: number) => void;
+    doWriteHotZone: (slot: number, index: number, value: number) => void;
+    doApplyAllFromCSV: (slot: number) => void;
+    doApplyTendsFromCSV: (slot: number) => void;
+    doApplyStatsFromCSV: (slot: number) => void;
+    exportROS: () => void;
+
+    // ── Helpers ────────────────────────────────────────────
+    getSlotData: (slot: number) => SlotData | null;
+    getPlayerName: (slot: number) => { first: string; last: string };
 }
 
-export interface AppState {
-    originalBuf: ArrayBuffer | null;
-    playerMap: Map<number, BTreeNode[]>;
-    nameMap: Map<number, string>;
-    sortedPids: number[];
-    edits: Map<number, Map<string, Edit>>;
-    selectedPid: number | null;
-    fileInfo: FileInfo | null;
-    isLoading: boolean;
-    loadingMsg: string;
-}
+export const useStore = create<CaelumStore>()((set, get) => ({
+    buf: null,
+    fileName: "",
+    csvFileName: "",
+    crcOk: null,
+    status: "",
+    namePool: [],
+    csvDb: null,
+    ovrCache: {},
+    selectedSlot: null,
 
-const initialState: AppState = {
-    originalBuf: null,
-    playerMap: new Map(),
-    nameMap: new Map(),
-    sortedPids: [],
-    edits: new Map(),
-    selectedPid: null,
-    fileInfo: null,
-    isLoading: false,
-    loadingMsg: "",
-};
-
-// ── Actions ──────────────────────────────────────────────────
-type Action =
-    | { type: "SET_LOADING"; msg: string }
-    | { type: "CLEAR_LOADING" }
-    | {
-        type: "FILE_LOADED";
-        buf: ArrayBuffer;
-        map: Map<number, BTreeNode[]>;
-        nameMap: Map<number, string>;
-        sortedPids: number[];
-        fileInfo: FileInfo;
-    }
-    | { type: "SELECT_PLAYER"; pid: number }
-    | {
-        type: "SET_STAT";
-        pid: number;
-        offset: number;
-        oldStat: number;
-        newStat: number;
-    }
-    | { type: "RESET_PLAYER"; pid: number }
-    | { type: "RESET_ALL" };
-
-function reducer(state: AppState, action: Action): AppState {
-    switch (action.type) {
-        case "SET_LOADING":
-            return { ...state, isLoading: true, loadingMsg: action.msg };
-        case "CLEAR_LOADING":
-            return { ...state, isLoading: false, loadingMsg: "" };
-        case "FILE_LOADED":
-            return {
-                ...state,
-                originalBuf: action.buf,
-                playerMap: action.map,
-                nameMap: action.nameMap,
-                sortedPids: action.sortedPids,
-                edits: new Map(),
-                selectedPid: null,
-                fileInfo: action.fileInfo,
-                isLoading: false,
-                loadingMsg: "",
-            };
-        case "SELECT_PLAYER":
-            return { ...state, selectedPid: action.pid };
-        case "SET_STAT": {
-            const newEdits = new Map(state.edits);
-            const key = String(action.offset);
-            if (!newEdits.has(action.pid)) newEdits.set(action.pid, new Map());
-            const pm = new Map(newEdits.get(action.pid)!);
-
-            if (action.newStat === action.oldStat) {
-                pm.delete(key);
-            } else {
-                pm.set(key, {
-                    offset: action.offset,
-                    oldStat: action.oldStat,
-                    newStat: action.newStat,
-                });
-            }
-            if (pm.size === 0) {
-                newEdits.delete(action.pid);
-            } else {
-                newEdits.set(action.pid, pm);
-            }
-            return { ...state, edits: newEdits };
+    loadROS: (bytes: Uint8Array, name: string) => {
+        const buf = new Uint8Array(bytes);
+        const pool = buildNamePool(buf);
+        const ovrCache: Record<number, number> = {};
+        for (let i = 0; i < N; i++) {
+            ovrCache[i] = decodeStat(buf[FLAT + i * SZ + SOFF]);
         }
-        case "RESET_PLAYER": {
-            const newEdits = new Map(state.edits);
-            newEdits.delete(action.pid);
-            return { ...state, edits: newEdits };
-        }
-        case "RESET_ALL":
-            return { ...state, edits: new Map() };
-        default:
-            return state;
-    }
-}
-
-// ── Context ──────────────────────────────────────────────────
-interface StoreContextValue {
-    state: AppState;
-    loadFile: (file: File) => Promise<void>;
-    selectPlayer: (pid: number) => void;
-    setStat: (pid: number, offset: number, oldStat: number, newStat: number) => void;
-    resetPlayer: (pid: number) => void;
-    resetAll: () => void;
-    downloadPatched: () => number | undefined;
-    totalEdits: number;
-    editedPlayerCount: number;
-}
-
-const StoreContext = createContext<StoreContextValue | null>(null);
-
-export function StoreProvider({ children }: { children: ReactNode }) {
-    const [state, dispatch] = useReducer(reducer, initialState);
-
-    const loadFile = useCallback(async (file: File) => {
-        dispatch({ type: "SET_LOADING", msg: "Reading file…" });
-        await new Promise((r) => setTimeout(r, 32));
-
-        const buf = await file.arrayBuffer();
-
-        dispatch({ type: "SET_LOADING", msg: "Scanning B-Tree…" });
-        await new Promise((r) => setTimeout(r, 32));
-
-        const { map, nameMap, elapsed } = scanBTree(buf);
-
-        // Sort: named players first (resolved or known), then by PID
-        const sortedPids = Array.from(map.keys()).sort((a, b) => {
-            const aName = nameMap.has(a) || !!KNOWN_PLAYERS[a];
-            const bName = nameMap.has(b) || !!KNOWN_PLAYERS[b];
-            if (aName && !bName) return -1;
-            if (!aName && bName) return 1;
-            // Alphabetical by resolved name
-            const an = getPlayerName(a, nameMap);
-            const bn = getPlayerName(b, nameMap);
-            return an.localeCompare(bn);
-        });
-
-        const totalNodes = [...map.values()].reduce((s, n) => s + n.length, 0);
-
-        dispatch({
-            type: "FILE_LOADED",
+        set({
             buf,
-            map,
-            nameMap,
-            sortedPids,
-            fileInfo: {
-                name: file.name,
-                size: file.size,
-                nodeCount: totalNodes,
-                scanTime: elapsed,
-                playerCount: map.size,
-            },
+            fileName: name,
+            namePool: pool,
+            crcOk: validateCRC(buf),
+            ovrCache,
+            selectedSlot: null,
+            status: `Loaded ${name} — search for players by name or slot number`,
         });
-    }, []);
+    },
 
-    const selectPlayer = useCallback((pid: number) => {
-        dispatch({ type: "SELECT_PLAYER", pid });
-    }, []);
+    loadCSV: (text: string, name: string) => {
+        try {
+            const db = parseCSV(text);
+            const count = Object.keys(db).length;
+            set({
+                csvDb: db,
+                csvFileName: name,
+                status: `CSV loaded — ${count} players. Stats, tendencies, hot zones & sig skills ready.`,
+            });
+        } catch (err: unknown) {
+            set({ status: `CSV error: ${err instanceof Error ? err.message : String(err)}` });
+        }
+    },
 
-    const setStat = useCallback(
-        (pid: number, offset: number, oldStat: number, newStat: number) => {
-            const clamped = Math.max(25, Math.min(99, Math.round(isNaN(newStat) ? 25 : newStat)));
-            dispatch({ type: "SET_STAT", pid, offset, oldStat, newStat: clamped });
-        },
-        []
-    );
+    selectPlayer: (slot: number | null) => set({ selectedSlot: slot }),
 
-    const resetPlayer = useCallback((pid: number) => {
-        dispatch({ type: "RESET_PLAYER", pid });
-    }, []);
+    doWriteStat: (slot: number, index: number, value: number) => {
+        const { buf } = get();
+        if (!buf) return;
+        engineWriteStat(buf, slot, index, value);
+        set({
+            crcOk: true,
+            ovrCache: index === 0
+                ? { ...get().ovrCache, [slot]: value }
+                : get().ovrCache,
+            status: `Stat[${index}]=${value} → slot ${slot} ✓`,
+        });
+    },
 
-    const resetAll = useCallback(() => {
-        dispatch({ type: "RESET_ALL" });
-    }, []);
+    doWriteTend: (slot: number, index: number, value: number) => {
+        const { buf } = get();
+        if (!buf) return;
+        engineWriteTend(buf, slot, index, value);
+        set({
+            crcOk: true,
+            status: `Tend[${index}]=${value} → slot ${slot} ✓`,
+        });
+    },
 
-    // ANTIPATTERN GUARD: originalBuf is never mutated.
-    // applyPatches() clones it, writes patched floats, recalculates CRC32, returns blob.
-    const downloadPatched = useCallback((): number | undefined => {
-        if (!state.originalBuf) return undefined;
-        const { patched, count } = applyPatches(state.originalBuf, state.edits);
-        const blob = new Blob([patched], { type: "application/octet-stream" });
+    doWriteHotZone: (slot: number, index: number, value: number) => {
+        const { buf } = get();
+        if (!buf) return;
+        engineWriteHotZone(buf, slot, index, value);
+        set({
+            crcOk: true,
+            status: `HotZone[${index}]=${value} → slot ${slot} ✓`,
+        });
+    },
+
+    doApplyStatsFromCSV: (slot: number) => {
+        const { buf, csvDb } = get();
+        if (!buf || !csvDb?.[slot]) return;
+        const row = csvDb[slot];
+        const base = FLAT + slot * SZ;
+        row.stats.forEach((v: number, i: number) => {
+            if (i < 43) buf[base + SOFF + i] = Math.max(0, Math.min(222, (v - 25) * 3));
+        });
+        fixCRC(buf);
+        set({
+            crcOk: true,
+            ovrCache: { ...get().ovrCache, [slot]: decodeStat(buf[FLAT + slot * SZ + SOFF]) },
+            status: `All CSV stats → slot ${slot} ✓`,
+        });
+    },
+
+    doApplyTendsFromCSV: (slot: number) => {
+        const { buf, csvDb } = get();
+        if (!buf || !csvDb?.[slot]) return;
+        const row = csvDb[slot];
+        const base = FLAT + slot * SZ;
+        row.tends.forEach((v: number, i: number) => {
+            if (i < 69) buf[base + 591 + i] = Math.max(0, Math.min(99, v));
+        });
+        fixCRC(buf);
+        set({ crcOk: true, status: `All CSV tendencies → slot ${slot} ✓` });
+    },
+
+    doApplyAllFromCSV: (slot: number) => {
+        const { buf, csvDb } = get();
+        if (!buf || !csvDb?.[slot]) return;
+        engineApplyAll(buf, slot, csvDb[slot]);
+        set({
+            crcOk: true,
+            ovrCache: { ...get().ovrCache, [slot]: decodeStat(buf[FLAT + slot * SZ + SOFF]) },
+            status: `All CSV data → slot ${slot} ✓`,
+        });
+    },
+
+    exportROS: () => {
+        const { buf } = get();
+        if (!buf) return;
+        fixCRC(buf);
+        const blob = new Blob([buf as BlobPart], { type: "application/octet-stream" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "NBA_Year_2013-14_CAELUM.ROS";
+        a.download = "NBA_Year_2013-14.ROS";
         a.click();
         URL.revokeObjectURL(url);
-        return count;
-    }, [state.originalBuf, state.edits]);
+        set({ status: "Exported ✓ CRC updated" });
+    },
 
-    const totalEdits = [...state.edits.values()].reduce((s, m) => s + m.size, 0);
-    const editedPlayerCount = [...state.edits.values()].filter((m) => m.size > 0).length;
+    getSlotData: (slot: number) => {
+        const { buf } = get();
+        if (!buf) return null;
+        return readSlot(buf, slot);
+    },
 
-    return (
-        <StoreContext.Provider
-            value={{
-                state,
-                loadFile,
-                selectPlayer,
-                setStat,
-                resetPlayer,
-                resetAll,
-                downloadPatched,
-                totalEdits,
-                editedPlayerCount,
-            }}
-        >
-            {children}
-        </StoreContext.Provider>
-    );
-}
-
-export function useStore(): StoreContextValue {
-    const ctx = useContext(StoreContext);
-    if (!ctx) throw new Error("useStore must be inside StoreProvider");
-    return ctx;
-}
+    getPlayerName: (slot: number) => {
+        const { buf, namePool, csvDb } = get();
+        if (csvDb?.[slot]) {
+            return { first: csvDb[slot].fn, last: csvDb[slot].ln };
+        }
+        const emb = EMBEDDED_MAP[slot];
+        if (emb) {
+            return { first: emb.fn, last: emb.ln };
+        }
+        if (buf && namePool.length > 0) {
+            return readPlayerName(buf, slot, namePool);
+        }
+        return { first: "", last: "" };
+    },
+}));

@@ -1,77 +1,172 @@
-import { Badge } from "@/components/ui/badge";
+import { useRef } from "react";
 import { useStore } from "@/lib/store";
-import { fmtBytes } from "@/lib/btree-engine";
 
 export function AppHeader() {
-    const { state, totalEdits } = useStore();
-    const fi = state.fileInfo;
+    const { buf, csvFileName, crcOk, status, exportROS, loadROS, loadCSV } = useStore();
+    const rosRef = useRef<HTMLInputElement>(null);
+    const csvRef = useRef<HTMLInputElement>(null);
+
+    const onROS = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = (ev) => {
+            loadROS(new Uint8Array(ev.target!.result as ArrayBuffer), f.name);
+        };
+        rd.readAsArrayBuffer(f);
+        if (rosRef.current) rosRef.current.value = "";
+    };
+
+    const onCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = (ev) => {
+            loadCSV(ev.target!.result as string, f.name);
+        };
+        rd.readAsText(f, "utf-16");
+        if (csvRef.current) csvRef.current.value = "";
+    };
 
     return (
-        <header className="col-span-2 flex items-center bg-deep border-b border-cborder relative overflow-hidden h-[52px]">
-            {/* Bottom glow line */}
-            <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan to-transparent opacity-30" />
+        <header
+            style={{
+                height: 44,
+                background: "var(--card)",
+                borderBottom: "1px solid var(--border)",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 14px",
+                gap: 10,
+                flexShrink: 0,
+                zIndex: 50,
+            }}
+        >
+            {/* Logo */}
+            <span
+                style={{
+                    fontSize: 16,
+                    fontWeight: 900,
+                    letterSpacing: "-0.04em",
+                    fontFamily: "var(--font-bebas), sans-serif",
+                    background: "linear-gradient(135deg, var(--color-cyan), var(--color-cyan2))",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                }}
+            >
+                CAELUM
+            </span>
+            <span style={{ color: "var(--border)" }}>|</span>
 
-            {/* Brand */}
-            <div className="flex items-center gap-0 h-full px-5 border-r border-cborder shrink-0">
-                <div className="w-7 h-7 relative mr-2.5 shrink-0">
-                    <svg viewBox="0 0 28 28" fill="none" className="w-full h-full">
-                        <polygon
-                            points="14,1 27,7.5 27,20.5 14,27 1,20.5 1,7.5"
-                            stroke="#00d4ff"
-                            strokeWidth="1"
-                            fill="rgba(0,212,255,0.06)"
-                        />
-                        <polygon
-                            points="14,6 22,10.5 22,19.5 14,24 6,19.5 6,10.5"
-                            stroke="#00d4ff"
-                            strokeWidth=".5"
-                            fill="rgba(0,212,255,0.04)"
-                            opacity=".5"
-                        />
-                        <circle cx="14" cy="14" r="2" fill="#00d4ff" opacity=".8" />
-                        <line x1="14" y1="1" x2="14" y2="6" stroke="#00d4ff" strokeWidth=".5" opacity=".4" />
-                        <line x1="14" y1="24" x2="14" y2="27" stroke="#00d4ff" strokeWidth=".5" opacity=".4" />
-                        <line x1="1" y1="7.5" x2="6" y2="10.5" stroke="#00d4ff" strokeWidth=".5" opacity=".4" />
-                        <line x1="22" y1="19.5" x2="27" y2="20.5" stroke="#00d4ff" strokeWidth=".5" opacity=".4" />
-                    </svg>
-                </div>
-                <div className="font-bebas text-[1.35rem] tracking-[.18em] text-ctext leading-none">
-                    CAE<span className="text-cyan">LUM</span>
-                </div>
-            </div>
-
-            {/* File info */}
-            <div className="flex items-center gap-3 font-dmono text-[.7rem] text-ctext2 flex-1">
-                <div className="w-px h-7 bg-cborder mx-4" />
-                <span className="text-cyan">{fi?.name ?? "—"}</span>
-                <span className="text-cborder2">·</span>
-                <span>{fi ? fmtBytes(fi.size) : "no file"}</span>
-                <span className="text-cborder2">·</span>
-                <span>{fi ? `${fi.nodeCount} nodes` : "0 nodes"}</span>
-                <span className="text-cborder2">·</span>
-                <span>{fi ? `${fi.scanTime}ms` : "—"}</span>
-            </div>
-
-            {/* Right badges */}
-            <div className="flex items-center gap-3 px-5 ml-auto">
-                <Badge
-                    variant="outline"
-                    className="font-dmono text-[.6rem] tracking-[.12em] uppercase border-cyan text-cyan shadow-[0_0_8px_rgba(0,212,255,0.2)] rounded-none"
+            {/* CRC Badge */}
+            {buf && (
+                <div
+                    style={{
+                        fontSize: 9,
+                        padding: "2px 8px",
+                        borderRadius: 3,
+                        fontFamily: "var(--font-dmono)",
+                        background: crcOk ? "rgba(0, 255, 136, 0.08)" : "rgba(255, 51, 85, 0.08)",
+                        color: crcOk ? "var(--color-green2)" : "var(--color-cred)",
+                        border: `1px solid ${crcOk ? "rgba(0, 255, 136, 0.2)" : "rgba(255, 51, 85, 0.2)"}`,
+                    }}
                 >
-                    B-Tree Engine v2
-                </Badge>
-                <Badge
-                    variant="outline"
-                    className="font-dmono text-[.6rem] tracking-[.12em] uppercase border-cborder2 text-ctext3 rounded-none"
-                >
-                    0x009EB4 → 0x0C2F74
-                </Badge>
-                {totalEdits > 0 && (
-                    <div className="font-dmono text-[.65rem] tracking-[.08em] px-3 py-1 bg-cyan text-void font-medium animate-pulse-badge">
-                        {totalEdits} edit{totalEdits !== 1 ? "s" : ""}
+                    {crcOk ? "✓ CRC OK" : "✗ CRC BAD"}
+                </div>
+            )}
+
+            {/* CSV Badge */}
+            {buf && (
+                csvFileName ? (
+                    <div
+                        style={{
+                            fontSize: 9,
+                            padding: "2px 8px",
+                            borderRadius: 3,
+                            fontFamily: "var(--font-dmono)",
+                            background: "rgba(0, 255, 136, 0.08)",
+                            color: "var(--color-green2)",
+                            border: "1px solid rgba(0, 255, 136, 0.2)",
+                        }}
+                    >
+                        ✓ CSV
                     </div>
-                )}
+                ) : (
+                    <div
+                        onClick={() => csvRef.current?.click()}
+                        style={{
+                            fontSize: 9,
+                            padding: "2px 8px",
+                            borderRadius: 3,
+                            fontFamily: "var(--font-dmono)",
+                            background: "rgba(0, 212, 255, 0.06)",
+                            color: "var(--color-cyan)",
+                            border: "1px solid rgba(0, 212, 255, 0.15)",
+                            cursor: "pointer",
+                        }}
+                    >
+                        + Load CSV
+                    </div>
+                )
+            )}
+
+            <input ref={csvRef} type="file" accept=".csv,.CSV" onChange={onCSV} style={{ display: "none" }} />
+
+            {/* Status */}
+            <div
+                style={{
+                    flex: 1,
+                    fontSize: 9,
+                    color: "var(--color-ctext3)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontFamily: "var(--font-dmono)",
+                }}
+            >
+                {status}
             </div>
+
+            {/* File buttons */}
+            <input ref={rosRef} type="file" accept=".ROS,.ros" onChange={onROS} style={{ display: "none" }} />
+
+            {!buf && (
+                <button
+                    onClick={() => rosRef.current?.click()}
+                    style={{
+                        background: "var(--color-lift)",
+                        border: "1px solid var(--color-cborder)",
+                        borderRadius: 5,
+                        padding: "5px 14px",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: "var(--color-ctext)",
+                        cursor: "pointer",
+                        fontFamily: "var(--font-dmono)",
+                    }}
+                >
+                    📦 OPEN .ROS
+                </button>
+            )}
+
+            {buf && (
+                <button
+                    onClick={exportROS}
+                    style={{
+                        background: "linear-gradient(135deg, var(--color-cyan), var(--color-cyan2))",
+                        border: "none",
+                        borderRadius: 5,
+                        padding: "5px 14px",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: "var(--background)",
+                        cursor: "pointer",
+                        fontFamily: "var(--font-dmono)",
+                    }}
+                >
+                    ↓ EXPORT .ROS
+                </button>
+            )}
         </header>
     );
 }

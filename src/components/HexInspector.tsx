@@ -1,77 +1,98 @@
 import { useStore } from "@/lib/store";
-import {
-    toHex,
-    floatToHex,
-    statToKey,
-    treeLabel,
-} from "@/lib/btree-engine";
+import { FLAT, SZ } from "@/lib/flat-engine";
 
-export function HexInspector() {
-    const { state } = useStore();
-    const pid = state.selectedPid;
-    if (!pid || !state.playerMap.has(pid)) return null;
+interface HexInspectorProps {
+    slot: number;
+}
 
-    const nodes = state.playerMap.get(pid)!;
-    const pidEdits = state.edits.get(pid);
-    const pidHi = (pid >> 8) & 0xff;
-    const pidLo = pid & 0xff;
-    const pidHex =
-        pidHi.toString(16).padStart(2, "0").toUpperCase() +
-        " " +
-        pidLo.toString(16).padStart(2, "0").toUpperCase();
+export function HexInspector({ slot }: HexInspectorProps) {
+    const { buf } = useStore();
+
+    if (!buf) return null;
+
+    const base = FLAT + slot * SZ;
+
+    const sections: { start: number; end: number; color: string; label: string }[] = [
+        { start: 548, end: 590, color: "var(--color-cyan)", label: "RATINGS (b/3+25)" },
+        { start: 591, end: 659, color: "var(--color-green2)", label: "TENDENCIES (raw 0-99)" },
+        { start: 660, end: 684, color: "var(--color-amber)", label: "HOT SPOTS / ZONES" },
+    ];
 
     return (
-        <div className="bg-surface border border-cborder p-4">
-            {/* Title */}
-            <div className="font-bebas text-[.9rem] tracking-[.12em] text-ctext2 mb-3 flex items-center gap-2">
-                <span className="text-cyan">⬡</span>
-                Node Inspector — raw 12-byte patterns
+        <>
+            <div
+                style={{
+                    fontSize: 9,
+                    color: "var(--color-ctext3)",
+                    marginBottom: 10,
+                    fontFamily: "var(--font-dmono)",
+                }}
+            >
+                Record @{" "}
+                <span style={{ color: "var(--color-cyan)", fontFamily: "var(--font-dmono)" }}>
+                    0x{base.toString(16).toUpperCase()}
+                </span>
             </div>
 
-            <div className="flex flex-col gap-0.5">
-                {nodes.map((node) => {
-                    const edit = pidEdits?.get(String(node.offset));
-                    const curStat = edit ? edit.newStat : node.stat;
-                    const curFval = statToKey(curStat);
-                    const fHex = floatToHex(curFval);
-                    const tid = node.treeId;
-                    const modified = edit !== undefined;
-
-                    return (
-                        <div
-                            key={node.offset}
-                            className={`grid font-dmono text-[.62rem] px-2 py-1.5 transition-colors hover:bg-lift
-                                ${modified ? "bg-cyan/[0.04] border-l border-l-cyan" : "bg-ccard"}`}
-                            style={{
-                                gridTemplateColumns: "90px 1fr 1fr",
-                                gap: "1rem",
-                            }}
-                        >
-                            {/* Offset + tree */}
-                            <span className="text-ctext3">
-                                {toHex(node.offset, 6)}{" "}
-                                <span className="text-ctext3/60">[T{tid >= 0 ? tid : "?"}]</span>
-                            </span>
-
-                            {/* Raw bytes */}
-                            <span className="text-cyan2 tracking-[.06em]">
-                                01 30 {pidHex} 00 00 00 00 {fHex}
-                            </span>
-
-                            {/* Decoded */}
-                            <span className="text-green2">
-                                stat={curStat}
-                                {modified && (
-                                    <span className="text-amber ml-1">
-                                        ← was {node.stat}
+            {sections.map(({ start, end, color, label }) => (
+                <div key={start} style={{ marginBottom: 14 }}>
+                    <div
+                        style={{
+                            fontSize: 8,
+                            color,
+                            marginBottom: 5,
+                            fontFamily: "var(--font-dmono)",
+                        }}
+                    >
+                        {label}
+                    </div>
+                    {Array.from(
+                        { length: Math.ceil((end - start + 1) / 8) },
+                        (_, ri) => {
+                            const f = start + ri * 8;
+                            const t = Math.min(end, f + 7);
+                            const bytes = Array.from(
+                                { length: t - f + 1 },
+                                (_, j) => buf[base + f + j]
+                            );
+                            return (
+                                <div
+                                    key={ri}
+                                    style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "40px 1fr 1fr",
+                                        gap: 8,
+                                        padding: "1px 0",
+                                        fontSize: 9,
+                                    }}
+                                >
+                                    <span
+                                        style={{
+                                            color: "var(--color-ctext3)",
+                                            fontFamily: "var(--font-dmono)",
+                                        }}
+                                    >
+                                        {f}
                                     </span>
-                                )}{" "}
-                                · {treeLabel(tid)}
-                            </span>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
+                                    <span style={{ fontFamily: "var(--font-dmono)", color }}>
+                                        {bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ")}
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontFamily: "var(--font-dmono)",
+                                            color: "var(--color-ctext3)",
+                                        }}
+                                    >
+                                        {start === 548
+                                            ? bytes.map((b) => Math.floor(b / 3) + 25).join(" ")
+                                            : bytes.map((b) => b).join(" ")}
+                                    </span>
+                                </div>
+                            );
+                        }
+                    )}
+                </div>
+            ))}
+        </>
     );
 }
